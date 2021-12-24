@@ -1,14 +1,21 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <binn.h>
 
 #define ACK_LENGTH 100
-#define MESSAGE_LENGTH 1024
+#define MESSAGE_LENGTH 500
 
 int main()
 {
+    //Creating packet using binn library so that it can be sent over the socket.
+    binn *packet;
+    packet = binn_object();
+
+    binn_object_set_int32(packet, "seq_number", 1234);
 
     int sock;
     struct sockaddr_in server;
@@ -31,9 +38,10 @@ int main()
 
         printf("Enter Message: ");
         fgets(clientMessage, MESSAGE_LENGTH, stdin);
+        binn_object_set_str(packet, "pay_load", clientMessage);
 
-        int msg = sendto(sock, clientMessage, MESSAGE_LENGTH, 0, (struct sockaddr *)&server, sizeof(server));
-
+        int msg = sendto(sock, binn_ptr(packet), binn_size(packet), 0, (struct sockaddr *)&server, sizeof(server));
+          
         if (msg >= 0)
         {
             printf("Sent message successfully.\n");
