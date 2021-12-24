@@ -1,24 +1,33 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
+#include <binn.h>
+
 #define ACK_LENGTH 100
-#define MESSAGE_LENGTH 1024
+#define MESSAGE_LENGTH 1000
+
+struct packet {
+    int sequenceNumber;
+    char *data;
+};
 
 int main()
 {
+
+    struct packet pkt;
 
     int sock;
     struct sockaddr_in server;
     struct sockaddr_in client;
     int clientLength = sizeof(client);
-    char ack[ACK_LENGTH] = "Received Message\0";
+    char ack[ACK_LENGTH] = "Next seq num 1";
     char clientMessage[MESSAGE_LENGTH];
 
     //cleaning buffers.
-    //memset(ack, '\0', ACK_LENGTH);
     memset(clientMessage, '\0', MESSAGE_LENGTH);
 
     sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -32,17 +41,18 @@ int main()
 
         //Binding to port.
         int bindValue = bind(sock, (struct sockaddr *)&server, sizeof(server));
-        printf("%d\n", bindValue);
         if (bindValue >= 0)
         {
             printf("Binded to port successfully.\n");
             int reply = recvfrom(sock, clientMessage, MESSAGE_LENGTH, 0, (struct sockaddr *)&client, &clientLength);
 
+            pkt.data = binn_object_str(clientMessage, "pay_load");
+
             if (reply >= 0)
             {
                 printf("Received message from %s and port %i\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
-                printf("Message: %s\n\n", clientMessage);
-
+                printf("Message: %s\n", pkt.data);
+            
                 int response = sendto(sock, ack, ACK_LENGTH, 0, (struct sockaddr *)&client, sizeof(client));
 
                 if (response >= 0)
