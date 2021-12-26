@@ -50,7 +50,7 @@ int main()
 
             if (reply >= 0)
             {
-                printf("ACK: %s\n", ack);
+                printf("next sequence number required: %d", binn_object_int32(ack, "seq_number"));
             }
             else
             {

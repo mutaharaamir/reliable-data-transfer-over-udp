@@ -10,7 +10,8 @@
 #define ACK_LENGTH 100
 #define MESSAGE_LENGTH 1000
 
-struct packet {
+struct packet
+{
     int sequenceNumber;
     char *data;
 };
@@ -24,7 +25,7 @@ int main()
     struct sockaddr_in server;
     struct sockaddr_in client;
     int clientLength = sizeof(client);
-    char ack[ACK_LENGTH] = "Next seq num 1";
+    // char ack[ACK_LENGTH] = "Next seq num1";
     char clientMessage[MESSAGE_LENGTH];
 
     //cleaning buffers.
@@ -44,33 +45,43 @@ int main()
         if (bindValue >= 0)
         {
             printf("Binded to port successfully.\n");
-            int reply = recvfrom(sock, clientMessage, MESSAGE_LENGTH, 0, (struct sockaddr *)&client, &clientLength);
 
-            pkt.data = binn_object_str(clientMessage, "pay_load");
-
-            if (reply >= 0)
+            while (1)
             {
-                printf("Received message from %s and port %i\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
-                printf("Message: %s\n", pkt.data);
-            
-                int response = sendto(sock, ack, ACK_LENGTH, 0, (struct sockaddr *)&client, sizeof(client));
+                int reply = recvfrom(sock, clientMessage, MESSAGE_LENGTH, 0, (struct sockaddr *)&client, &clientLength);
+                pkt.data = binn_object_str(clientMessage, "pay_load");
+                pkt.sequenceNumber = binn_object_int32(clientMessage, "seq_number");
 
-                if (response >= 0)
+                binn *seqnum;
+                seqnum = binn_object();
+
+                binn_object_set_int32(seqnum, "seq_number", pkt.sequenceNumber+1);
+
+                if (reply >= 0)
                 {
-                    printf("Successfully responded.\n");
+
+                    printf("Received message from %s and port %i\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
+                    printf("Message: %s\n", pkt.data);
+
+                    int response = sendto(sock, binn_ptr(seqnum), binn_size(seqnum), 0, (struct sockaddr *)&client, sizeof(client));
+
+                    if (response >= 0)
+                    {
+                        printf("Successfully responded.\n");
+                    }
+                    else
+                    {
+                        printf("Could not respond.\n");
+                        close(sock);
+                        return -1;
+                    }
                 }
                 else
                 {
-                    printf("Could not respond.\n");
+                    printf("Could not receive a reply.\n");
                     close(sock);
                     return -1;
                 }
-            }
-            else
-            {
-                printf("Could not receive a reply.\n");
-                close(sock);
-                return -1;
             }
         }
         else
