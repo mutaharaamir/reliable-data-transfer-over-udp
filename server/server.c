@@ -8,7 +8,7 @@
 #include <binn.h>
 
 #define ACK_LENGTH 100
-#define MESSAGE_LENGTH 1000
+#define MESSAGE_LENGTH 500
 
 struct packet
 {
@@ -28,6 +28,8 @@ int main()
     // char ack[ACK_LENGTH] = "Next seq num1";
     char clientMessage[MESSAGE_LENGTH];
 
+    FILE *outputFileptr;
+
     //cleaning buffers.
     memset(clientMessage, '\0', MESSAGE_LENGTH);
 
@@ -46,6 +48,10 @@ int main()
         {
             printf("Binded to port successfully.\n");
 
+            outputFileptr = fopen("output_file.mp4", "wb");
+
+            int lastSequenceNumber = -1;
+
             while (1)
             {
                 int reply = recvfrom(sock, clientMessage, MESSAGE_LENGTH, 0, (struct sockaddr *)&client, &clientLength);
@@ -55,19 +61,27 @@ int main()
                 binn *seqnum;
                 seqnum = binn_object();
 
-                binn_object_set_int32(seqnum, "seq_number", pkt.sequenceNumber+1);
-
                 if (reply >= 0)
                 {
-
                     printf("Received message from %s and port %i\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
-                    printf("Message: %s\n", pkt.data);
-
-                    int response = sendto(sock, binn_ptr(seqnum), binn_size(seqnum), 0, (struct sockaddr *)&client, sizeof(client));
-
+                    //
+                    int response;
+                    if (pkt.sequenceNumber == lastSequenceNumber + 1)
+                    {
+                        printf("Sequence number: %d\n", pkt.sequenceNumber);
+                        fwrite(pkt.data, 1, MESSAGE_LENGTH, outputFileptr);
+                        binn_object_set_int32(seqnum, "seq_number", pkt.sequenceNumber + 1);
+                        lastSequenceNumber++;
+                        response = sendto(sock, binn_ptr(seqnum), binn_size(seqnum), 0, (struct sockaddr *)&client, sizeof(client));
+                    }
+                    else
+                    {
+                        binn_object_set_int32(seqnum, "seq_number", lastSequenceNumber + 1);
+                        response = sendto(sock, binn_ptr(seqnum), binn_size(seqnum), 0, (struct sockaddr *)&client, sizeof(client));
+                    }
                     if (response >= 0)
                     {
-                        printf("Successfully responded.\n");
+                        printf("Successfully responded.\nListening..\n");
                     }
                     else
                     {
