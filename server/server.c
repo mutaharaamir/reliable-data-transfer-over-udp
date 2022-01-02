@@ -12,26 +12,30 @@
 
 struct packet
 {
-    int sequenceNumber;
-    char *data;
+    int seqNum;
+    char data[MESSAGE_LENGTH];
+};
+
+struct acknowledgement
+{
+    int ackNum;
 };
 
 int main()
 {
 
-    struct packet pkt;
-
     int sock;
     struct sockaddr_in server;
     struct sockaddr_in client;
     int clientLength = sizeof(client);
-    // char ack[ACK_LENGTH] = "Next seq num1";
-    char clientMessage[MESSAGE_LENGTH];
+
+    // char clientMessage[MESSAGE_LENGTH];
+    // char ack[ACK_LENGTH] = "Ack";
 
     FILE *outputFileptr;
 
     //cleaning buffers.
-    memset(clientMessage, '\0', MESSAGE_LENGTH);
+    // memset(clientMessage, '\0', MESSAGE_LENGTH);
 
     sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
@@ -48,37 +52,53 @@ int main()
         {
             printf("Binded to port successfully.\n");
 
-            outputFileptr = fopen("output_file.mp4", "wb");
+            outputFileptr = fopen("output.mp4", "wb");
 
-            int lastSequenceNumber = -1;
+            int lastSeqNumReceived = -1;
 
             while (1)
             {
-                int reply = recvfrom(sock, clientMessage, MESSAGE_LENGTH, 0, (struct sockaddr *)&client, &clientLength);
-                pkt.data = binn_object_str(clientMessage, "pay_load");
-                pkt.sequenceNumber = binn_object_int32(clientMessage, "seq_number");
 
-                binn *seqnum;
-                seqnum = binn_object();
+                struct packet pkt;
+                memset(pkt.data, '\0', MESSAGE_LENGTH);
+
+                int reply = recvfrom(sock, &pkt, sizeof(struct packet), 0, (struct sockaddr *)&client, &clientLength);
 
                 if (reply >= 0)
                 {
-                    printf("Received message from %s and port %i\n", inet_ntoa(client.sin_addr), ntohs(client.sin_port));
-                    //
+
                     int response;
-                    if (pkt.sequenceNumber == lastSequenceNumber + 1)
+
+                    int fin = pkt.seqNum;
+                    // printf("Fin: %d\n", pkt.seqNum);
+                    if (fin == -5)
                     {
-                        printf("Sequence number: %d\n", pkt.sequenceNumber);
-                        fwrite(pkt.data, 1, MESSAGE_LENGTH, outputFileptr);
-                        binn_object_set_int32(seqnum, "seq_number", pkt.sequenceNumber + 1);
-                        lastSequenceNumber++;
-                        response = sendto(sock, binn_ptr(seqnum), binn_size(seqnum), 0, (struct sockaddr *)&client, sizeof(client));
+                        fclose(outputFileptr);
+                        printf("File write complete.\n");
+                        break;
+                    }
+
+                    if (pkt.seqNum != lastSeqNumReceived + 1)
+                    {
+                        struct acknowledgement ack;
+                        ack.ackNum = lastSeqNumReceived + 1;
+
+                        response = sendto(sock, &ack, sizeof(struct acknowledgement), 0, (struct sockaddr *)&client, sizeof(client));
                     }
                     else
                     {
-                        binn_object_set_int32(seqnum, "seq_number", lastSequenceNumber + 1);
-                        response = sendto(sock, binn_ptr(seqnum), binn_size(seqnum), 0, (struct sockaddr *)&client, sizeof(client));
+
+                        printf("Received seq num: %d\n", pkt.seqNum);
+
+                        fwrite(pkt.data, 1, MESSAGE_LENGTH, outputFileptr);
+
+                        struct acknowledgement ack;
+                        ack.ackNum = pkt.seqNum + 1;
+
+                        response = sendto(sock, &ack, sizeof(struct acknowledgement), 0, (struct sockaddr *)&client, sizeof(client));
+                        lastSeqNumReceived++;
                     }
+
                     if (response >= 0)
                     {
                         printf("Successfully responded.\nListening..\n");
@@ -96,7 +116,7 @@ int main()
                     close(sock);
                     return -1;
                 }
-            }
+            } //End of while loop.
         }
         else
         {
