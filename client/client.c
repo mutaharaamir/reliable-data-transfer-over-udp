@@ -5,9 +5,6 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-// #include <binn.h>
-
-#define ACK_LENGTH 100
 #define MESSAGE_LENGTH 500
 
 struct packet
@@ -40,8 +37,6 @@ int main()
 
         int seqNum = 0;
 
-        /***********************************************************/
-
         fptr = fopen("sample_video.mp4", "rb");
 
         if (fptr == NULL)
@@ -50,8 +45,6 @@ int main()
             close(sock);
             return -1;
         }
-
-        /***********************************************************/
 
         while (1)
         {
@@ -117,9 +110,8 @@ int main()
             }
 
             seqNum++;
-        } //End of while loop.
+        } 
 
-        /***********************************************************/
         fclose(fptr);
     }
     else

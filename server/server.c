@@ -5,9 +5,6 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
-#include <binn.h>
-
-#define ACK_LENGTH 100
 #define MESSAGE_LENGTH 500
 
 struct packet
@@ -29,13 +26,7 @@ int main()
     struct sockaddr_in client;
     int clientLength = sizeof(client);
 
-    // char clientMessage[MESSAGE_LENGTH];
-    // char ack[ACK_LENGTH] = "Ack";
-
     FILE *outputFileptr;
-
-    //cleaning buffers.
-    // memset(clientMessage, '\0', MESSAGE_LENGTH);
 
     sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
@@ -70,7 +61,6 @@ int main()
                     int response;
 
                     int fin = pkt.seqNum;
-                    // printf("Fin: %d\n", pkt.seqNum);
                     if (fin == -5)
                     {
                         fclose(outputFileptr);
@@ -116,7 +106,7 @@ int main()
                     close(sock);
                     return -1;
                 }
-            } //End of while loop.
+            }
         }
         else
         {
