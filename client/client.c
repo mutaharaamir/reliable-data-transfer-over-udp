@@ -4,24 +4,30 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <binn.h>
+
+// #include <binn.h>
 
 #define ACK_LENGTH 100
-#define MESSAGE_LENGTH 496
+#define MESSAGE_LENGTH 500
+
+struct packet
+{
+    int seqNum;
+    char data[MESSAGE_LENGTH];
+};
+
+struct acknowledgement
+{
+    int ackNum;
+};
 
 int main()
 {
     int sock;
     struct sockaddr_in server;
     int serverLength = sizeof(server);
-    char ack[ACK_LENGTH];
-    char clientMessage[MESSAGE_LENGTH];
 
     FILE *fptr;
-
-    //cleaning buffers.
-    memset(ack, '\0', ACK_LENGTH);
-    memset(clientMessage, '\0', MESSAGE_LENGTH);
 
     sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
@@ -35,10 +41,11 @@ int main()
         int seqNum = 0;
 
         /***********************************************************/
-      
+
         fptr = fopen("sample_video.mp4", "rb");
-        
-        if (fptr == NULL){
+
+        if (fptr == NULL)
+        {
             printf("Error opening file.\n");
             close(sock);
             return -1;
@@ -46,42 +53,54 @@ int main()
 
         /***********************************************************/
 
-        while (1) 
+        while (1)
         {
+            struct packet pkt;
+            pkt.seqNum = seqNum;
 
-            size_t num_read = fread(clientMessage, 1, MESSAGE_LENGTH, fptr);
+            memset(pkt.data, '\0', MESSAGE_LENGTH);
 
-            if ( num_read == 0 ){
+            size_t num_read = fread(pkt.data, 1, MESSAGE_LENGTH, fptr);
+
+            struct acknowledgement ack;
+
+            //EOF.
+            if (num_read == 0)
+            {
+                pkt.seqNum = -5;
+                int msg = sendto(sock, &pkt, sizeof(struct packet), 0, (struct sockaddr *)&server, sizeof(server));
+
+                if (msg >= 0)
+                {
+                    printf("Send complete. Fin signal sent.\n");
+                }
+                else
+                {
+                    printf("Error sending fin signal.\n");
+                }
+
                 break;
             }
 
-            //Creating packet using binn library so that it can be sent over the socket.
-            binn *packet;
-            packet = binn_object();
-
-            // printf("Enter Message: ");
-            // fgets(clientMessage, MESSAGE_LENGTH, stdin);
-            binn_object_set_str(packet, "pay_load", clientMessage);
-            binn_object_set_int32(packet, "seq_number", seqNum);
-
-            int msg = sendto(sock, binn_ptr(packet), binn_size(packet), 0, (struct sockaddr *)&server, sizeof(server));
+            int msg = sendto(sock, &pkt, sizeof(struct packet), 0, (struct sockaddr *)&server, sizeof(server));
 
             if (msg >= 0)
             {
                 printf("Sent message successfully.\n");
 
-                int reply = recvfrom(sock, ack, sizeof(ack), 0, (struct sockaddr *)&server, &serverLength);
-            
-                if (binn_object_int32(ack, "seq_number") == seqNum) {
-                    printf("Next sequence number required: %d\n", binn_object_int32(ack, "seq_number"));
-                    fseek(fptr, -MESSAGE_LENGTH, SEEK_CUR);
-                    continue;
-                }
-
+                int reply = recvfrom(sock, &ack, sizeof(struct acknowledgement), 0, (struct sockaddr *)&server, &serverLength);
 
                 if (reply >= 0)
                 {
-                    printf("Next sequence number required: %d\n", binn_object_int32(ack, "seq_number"));
+
+                    //If the same packet is requested again.
+                    if (ack.ackNum == pkt.seqNum)
+                    {   
+                        //Moving fptr read bytes back.
+                        fseek(fptr, -num_read, SEEK_CUR);
+                    }
+
+                    printf("Next seq num req: %d\n", ack.ackNum);
                 }
                 else
                 {
@@ -96,9 +115,12 @@ int main()
                 close(sock);
                 return -1;
             }
-            binn_free(packet);
+
             seqNum++;
-        }
+        } //End of while loop.
+
+        /***********************************************************/
+        fclose(fptr);
     }
     else
     {
