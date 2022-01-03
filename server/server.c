@@ -34,7 +34,7 @@ int main()
     {
         printf("Socket created successfully.\n");
         server.sin_family = AF_INET;
-        server.sin_port = htons(2000);
+        server.sin_port = htons(2006);
         server.sin_addr.s_addr = inet_addr("127.0.0.1");
 
         //Binding to port.
@@ -61,6 +61,7 @@ int main()
                     int response;
 
                     int fin = pkt.seqNum;
+                    printf("%d\n", fin);
                     if (fin == -5)
                     {
                         fclose(outputFileptr);
